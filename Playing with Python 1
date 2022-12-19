@@ -48,5 +48,14 @@ if "lined" in a:
     print("Yes, 'lined' is present ")
 
 txt = "The best things in life are free!"
+replacementText= "123"
 if "expensive" not in txt:
     print("No, expensive is NOT present")
+print (txt[-5:]) # negative indexes start the slice from the end of the string
+
+print(txt.replace("T", replacementText))
+
+a= "Hello"
+age= 4
+c= "My name is John Doe and I am {} years old"
+print(c.format(age))
