@@ -82,3 +82,16 @@ print(bool(myobj))
 print(isinstance(a, int))
 
 print(10*5)
+
+#Python Lists
+alist = ["One", "Two", "Three"]
+print(len(alist))
+
+list1 = ["1", "2", "3"]
+list2 = [1, 2, 3]
+list3 = [True, False, False]
+print(list1, list2, list3)
+'''List is a collection which is ordered and changeable. Allows duplicate members.
+Tuple is a collection which is ordered and unchangeable. Allows duplicate members.
+Set is a collection which is unordered, unchangeable*, and unindexed. No duplicate members.
+Dictionary is a collection which is ordered** and changeable. No duplicate members.'''
