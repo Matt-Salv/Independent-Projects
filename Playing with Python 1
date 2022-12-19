@@ -59,3 +59,26 @@ a= "Hello"
 age= 4
 c= "My name is John Doe and I am {} years old"
 print(c.format(age))
+#escape characters include "\", "\\", "\n", and more.
+
+a= 200
+b= 33
+
+if b > a:
+    print("b is greater than a")
+else:
+    print("b is not greater than a")
+
+print(bool(a))
+print(bool(b))
+
+class myClass():
+    def __len__(self):
+        return 0
+
+myobj = myClass()
+print(bool(myobj))
+
+print(isinstance(a, int))
+
+print(10*5)
