@@ -1,0 +1,23 @@
+if 5 > 2:
+    print("Five is greater than two!")
+x = 5
+y = "Hello, World!"
+#Setting up variables and placing my first comment :^)
+#and now a multi line comment, woot!
+"""
+Another comment test
+Written on multiple lines without putting a # in front of each! 
+Nice :)
+"""
+#Let's try casting some Variables
+x= str(3) #'3'
+y= int(3) #3
+z= float(3) #3.0
+print (x, y, z)
+print (type(x)) #Get the type! str
+print(type(y)) #check out y as well, int
+print(type(z)) #now z! float
+
+a = 4
+A = "Case-sensitive variables!" #a and A are different, wow, technology :^)
+print(a, A)
