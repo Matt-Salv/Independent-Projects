@@ -39,3 +39,14 @@ print(type(c))
 
 import random
 print(random.randrange(1, 69))
+
+#Python Strings
+a = """this is a multi-
+lined string"""
+print(len(a))
+if "lined" in a:
+    print("Yes, 'lined' is present ")
+
+txt = "The best things in life are free!"
+if "expensive" not in txt:
+    print("No, expensive is NOT present")
