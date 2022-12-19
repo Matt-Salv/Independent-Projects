@@ -15,8 +15,27 @@ print(fruitApple, fruitBanana, fruitCherry)
 
 x = "Awesome"
 def myfunc():
+    global x
     x = "Fantastic!"
     print("Python is " + x)
 
 myfunc()
 print("Pythons " + x)
+
+#Python numbers
+x = 1 # int, whole number without +/-, decimal, unlim. length
+y = 2.8 # float, positive or negative, one or more decimals
+z = 1j # complex 
+
+#Type conversion
+a = float(x)
+b= int(y)
+c = complex (x)
+
+print(a, b, c)
+print(type(a))
+print(type(b))
+print(type(c))
+
+import random
+print(random.randrange(1, 69))
