@@ -1,3 +1,15 @@
+import bpy
+import bpy_extras.io_utils
+import struct
+import os
+from bpy.props import (
+    IntProperty,
+    BoolProperty,
+    StringProperty,
+    CollectionProperty,
+    EnumProperty,
+)
+
 bl_info = {
     "name": "Dragon Nest MSH Exporter",
     "author": "Matt-Salv",
@@ -11,11 +23,8 @@ bl_info = {
     "category": "Import-Export",
 }
 
-import bpy
-import bpy_extras.io_utils
-
 class ExportMSH(bpy.types.Operator):
-    bl_idname = "export_scene.dragon_nest"
+    bl_idname = "export_msh.dragon_nest"
     bl_label = "Export Dragon Nest Model"
     bl_options = {'PRESET', 'UNDO'}
 
@@ -32,9 +41,11 @@ def menu_func_export(self, context):
 
 def register ():
         bpy.utils.register_class(ExportMSH)
+        bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
 
 def unregister():
     bpy.utils.unregister_class(ExportMSH)
+    bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
 
 if __name__ == "__main__":
     register()
