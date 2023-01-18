@@ -9,6 +9,7 @@ from bpy.props import (
     CollectionProperty,
     EnumProperty,
 )
+from . exportmsh import MeshDataPointer
 
 bl_info = {
     "name": "Dragon Nest MSH Exporter",
@@ -141,7 +142,7 @@ class ExportMSH(bpy.types.Operator):
                             header.bbMin[coord_index] = coord
             meshes.append(mesh)
         header.boneCount = len(bone_data_list)
-        MeshDataPointer = MeshDataPointer(bone_data_list)
+        mesh_data_pointer = MeshDataPointer(bone_data_list)
         mesh_info_list = []
         for mesh in meshes:
             mesh_info = MeshInfo()
