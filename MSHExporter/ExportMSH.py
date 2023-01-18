@@ -31,4 +31,4 @@ def ExportMSH():
     file.write(weights_bytes)
     file.write(obj_name.encode())
 
-bpy.ops.export_scene.msh(filepath=export_path, use_selection=True)
+bpy.ops.export_scene.msh(filepath=export_path, use_selection=True)  
