@@ -100,6 +100,16 @@ class ExportMSH(bpy.types.Operator):
         if not bpy.context.selected_objects:
             self.report({'WARNING'}, "No objects selected.")
             return {'CANCELLED'}
+        for obj in context.selected_objects:
+            if obj.type == 'MESH':
+                print("Selected object is a mesh.")
+                mesh = obj
+            elif obj.type == 'ARMATURE':
+                armature = obj
+                print("Selected object is an armature.")
+            # add additional checks for other object types here
+            else:
+                print("Selected object is of an unknown type.")
         
         header = Header()
         header.name = b'Eternity Engine Mesh File 0.1'
@@ -114,37 +124,22 @@ class ExportMSH(bpy.types.Operator):
             
         meshes = []
         bone_data_list = []
-        for armature in bpy.data.armatures:
-            for obj in bpy.context.selected_objects:
-                if obj.type == 'MESH':
-                    mesh = obj.data
-                    header.meshCount += 1
-                    armature = obj.find_armature()
-                    if armature is not None:
-                        for bone in armature.data.bones:
-                            bone_data = BoneData()
-                            bone_data.boneName = bone.name
-                            bone_data.transformMatrix = bone.matrix
-                            bone_data_list.append(bone_data)
-            header.boneCount = len(bone_data_list)
-            for armature in obj.modifiers: #iterate over armatures linked to object
-                        header.boneCount += len(bone_data_list)
-                        if armature.type == 'ARMATURE':
-                            armature_obj = armature.object #iterate over bones in armature
-                            for bone in mesh.data.bones:
-                                bone_data = BoneData()
-                                bone_data.boneName = bone.name
-                                bone_data.transformMatrix = bone.matrix
-                                bone_data_list.append(bone_data)
-            if obj.type == 'MESH':
-                    for vertex in obj.data.vertices:
-                        if vertex.select:
-                            for coord_index, coord in enumerate(vertex.co):
-                                if coord > header.bbMax[coord_index]:
-                                    header.bbMax[coord_index] = coord
-                                if coord < header.bbMin[coord_index]:
-                                    header.bbMin[coord_index] = coord
-                    meshes.append(obj)
+        if armature:
+            for bone in armature.data.edit_bones:
+                bone_data = BoneData()
+                bone_data.boneName = bone.name
+                bone_data.transformMatrix = bone.matrix
+                bone_data_list.append(bone_data)
+        header.boneCount = len(bone_data_list)
+        if mesh:
+            for vertex in mesh.data.vertices:
+                if vertex.select:
+                    for coord_index, coord in enumerate(vertex.co):
+                        if coord > header.bbMax[coord_index]:
+                            header.bbMax[coord_index] = coord
+                        if coord < header.bbMin[coord_index]:
+                            header.bbMin[coord_index] = coord
+            meshes.append(mesh)
         header.boneCount = len(bone_data_list)
         MeshDataPointer = MeshDataPointer(bone_data_list)
         mesh_info_list = []
