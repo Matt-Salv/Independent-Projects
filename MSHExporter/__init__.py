@@ -24,19 +24,21 @@ from bpy.props import (
     EnumProperty,
 )
 
-class Header:               #Msh Header 1024 bytes
-    def __init__(self):
-        self.name = bytearray(256) #Eternity Engine Mesh File 0.1
-        self.version = 0 #version number (0.1 = version 10, 0.11 = 11, etc.)
-        self.meshCount = 0 #Number of meshes/entries [E]
-        self.unknown1 = 0x1 #unsure the type, 4 bytes
-        self.unknown2 = 0x0 # same as above^
-        self.bbMin = [0.0, 0.0, 0.0] #bounding box min/max tells the game engine the object's size, visibility, collision for performance optimization
-        self.bbMax = [0.0, 0.0, 0.0]
-        self.boneCount = 0 #number of bones [B]
-        self.Attributes = 0 #num attributes [At]
-        self.AttachmentPoints = 0 #number attachmentpoints [Ap]
-        self.empty = bytearray(768 - 52) #keep the 1024 bytes :^)
+#!!!!! IMPORTANT: RENAME THE BLEND FILE NAME TO MATCH THE DESIRED .MSH FILE NAME !!!!!!!
+
+class HeaderClass:               #Msh Header 1024 bytes
+    def __init__(self, name, version, meshCount, unknown1, unknown2, bbMin, bbMax, boneCount, Attributes, AttachmentPoints, empty):
+        self.name = name  #Eternity Engine Mesh File 0.1
+        self.version = version #version number (0.1 = version 10, 0.11 = 11, etc.)
+        self.meshCount = meshCount #Number of meshes/entries [E]
+        self.unknown1 = unknown1 #unsure the type, 4 bytes
+        self.unknown2 = unknown2 #unsure the type, 4 bytes
+        self.bbMin = bbMin #bounding box min/max tells the game engine the object's size, visibility, collision for performance optimization
+        self.bbMax = bbMax #number of bones [B]
+        self.boneCount = boneCount #number of bones [B]
+        self.Attributes = Attributes #num attributes [At]
+        self.AttachmentPoints = AttachmentPoints #number attachmentpoints [Ap]
+        self.empty = empty #keep the 1024 bytes: bytearray(768-52)
 
     def set_version(self):
         version_string = self.name.decode("utf-8")
@@ -97,10 +99,10 @@ class Attribute:
         self.unknown1 = [0.0 for _ in range(4)]
         self.unknown2 = [0.0 for _ in range(7)]
         self.unknown3_matrices = [[[0.0 for _ in range(3)] for _ in range(3)] for _ in range(3)]
-        if Header.version >= 0.12:
+        if HeaderClass.version >= 0.12:
             self.parent_name = bytearray(256)  # FLString parent name (if msh.Version >= 11)
             self.translation = [0.0,0.0,0.0]
-            if Header.version >= .13:
+            if HeaderClass.version >= .13:
                 Attribute.transform_matrix = [[0.0 for _ in range(4)] for _ in range(4)]
                 self.attributes.append(Attribute)
 
@@ -137,18 +139,23 @@ class Vec4F(Vec3F):
             self.w = vector.w
 
 def read_msh_header(filepath):
-    with open(filepath, 'rb') as file:
-        name = file.read(256).decode("utf-8")
-        version = struct.unpack('i', file.read(4))[0]
-        meshCount = struct.unpack('i', file.read(4))[0]
-        unknown1 = struct.unpack('i', file.read(4))[0]
-        unknown2 = struct.unpack('i', file.read(4))[0]
-        bbMin = struct.unpack('<3f', file.read(12))[0]
-        bbMax = struct.unpack('<3f', file.read(12))[0]
-        boneCount =  struct.unpack('i', file.read(4))[0]
-        Attributes =  struct.unpack('i', file.read(4))[0]
-        AttachmentPoints =  struct.unpack('i', file.read(4))[0]
-        empty = bytearray(768 - 52)
+    print(f"The file name is: {filepath}")
+    # Open the file and read the header data
+    with open(filepath, "rb") as f:
+        name = f.read(256)
+        version = struct.unpack("f", f.read(4))[0]
+        meshCount = struct.unpack("i", f.read(4))[0]
+        unknown1 = struct.unpack("i", f.read(4))[0]
+        unknown2 = struct.unpack("i", f.read(4))[0]
+        bbMin = struct.unpack("3f", f.read(12))
+        bbMax = struct.unpack("3f", f.read(12))
+        boneCount = struct.unpack("i", f.read(4))[0]
+        Attributes = struct.unpack("i", f.read(4))[0]
+        AttachmentPoints = struct.unpack("i", f.read(4))[0]
+        empty = f.read(768 - 52)
+
+    # Return the header values as a tuple
+    return (name, version, meshCount, unknown1, unknown2, bbMin, bbMax, boneCount, Attributes, AttachmentPoints, empty)
 
 class ExportMSH(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
     bl_idname = "export_msh.dragon_nest"
@@ -156,24 +163,42 @@ class ExportMSH(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
     bl_options = {'PRESET', 'UNDO'}
 
     filename_ext = ".msh"
-    filter_glob: StringProperty(default="*.msh", options={'HIDDEN'})
-    filepath = object.filepath
-    filepath = bpy.path.ensure_ext(filepath, ".msh")
+    filter_glob: StringProperty(
+        default="*.msh", 
+        options={'HIDDEN'},
+        maxlen=255, #max internal buffer
+        )
+    filepath: StringProperty(
+        name="File Path",
+        description="Filepath used for exporting the .msh file",
+        maxlen=1024,
+        default="",
+    )
+    # New property to specify a different output filepath and name
+    output_filepath = StringProperty(
+        pathName="Output File Path",
+        description="File path to save the exported data",
+        maxlen=1024,
+        default="",
+    )
 
-    def invoke(self, context, event, filepath):
-        file_path = bpy.path.abspath(self.filepath)
-        name, version, meshCount, unknown1, unknown2, bbMin, bbMax, boneCount, Attributes, AttachmentPoints = read_msh_header(file_path)
-        MSH_header = Header(name=name, version=version, meshCount=meshCount, unknown1=unknown1, 
-                                    unknown2=unknown2, bbMin=bbMin, bbMax=bbMax, boneCount=boneCount, Attributes=Attributes, 
-                                    AttachmentPoints=AttachmentPoints)
-        return ExportMSH.execute(self, context)
-
-    def execute (self, context, filepath):
+    def execute (self, context):
         if not bpy.context.selected_objects:
             self.report({'WARNING'}, "No objects selected.")
             return {'CANCELLED'}
+        output_filepath = bpy.path.abspath(self.filepath)
+        if os.path.isfile(output_filepath):
+            output_filepath = output_filepath[:-4] + "_1.msh"
+        output_filepath = open(output_filepath, 'wb')
+        #ensure the filepath is an absolute path and a .msh
+        output_filepath = bpy.path.ensure_ext(output_filepath, ".msh")
+        read_msh_header(output_filepath)
+        name, version, meshCount, unknown1, unknown2, bbMin, bbMax, boneCount, Attributes, AttachmentPoints = read_msh_header(output_filepath)
+        MSH_header = HeaderClass(name=name, version=version, meshCount=meshCount, unknown1=unknown1, 
+                                    unknown2=unknown2, bbMin=bbMin, bbMax=bbMax, boneCount=boneCount, Attributes=Attributes, 
+                                    AttachmentPoints=AttachmentPoints)
 
-        MSH_header = Header()
+        MSH_header = HeaderClass()
         attributes_count = 0
         attachment_points_count = 0
         for obj in context.selected_objects:
@@ -199,9 +224,9 @@ class ExportMSH(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
                 print("Selected object is a mesh.")
                 obj = bpy.context.object
                 mesh = obj
-                obj.Header = Header()
-                if obj.Header.version > Header.version:
-                    Header.version = obj.msh.version
+                obj.Header = HeaderClass()
+                if obj.Header.version > HeaderClass.version:
+                    HeaderClass.version = obj.msh.version
             elif obj.type == 'ARMATURE':
                 armature = obj
                 print("Selected object is an armature.")
@@ -217,17 +242,17 @@ class ExportMSH(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
                 bone_data.boneName = bone.name
                 bone_data.transformMatrix = bone.matrix
                 bone_data_list.append(bone_data)
-        Header.boneCount = len(bone_data_list)
+        HeaderClass.boneCount = len(bone_data_list)
         if mesh:
             for vertex in mesh.data.vertices:
                 if vertex.select:
                     for coord_index, coord in enumerate(vertex.co):
-                        if coord > Header.bbMax[coord_index]:
-                            Header.bbMax[coord_index] = coord
-                        if coord < Header.bbMin[coord_index]:
-                            Header.bbMin[coord_index] = coord
+                        if coord > HeaderClass.bbMax[coord_index]:
+                            HeaderClass.bbMax[coord_index] = coord
+                        if coord < HeaderClass.bbMin[coord_index]:
+                            HeaderClass.bbMin[coord_index] = coord
             meshes.append(mesh)
-        Header.boneCount = len(bone_data_list)
+        HeaderClass.boneCount = len(bone_data_list)
         mesh_data_pointer = MeshDataPointer(bone_data_list)
         mesh_data_pointer.bone_data_list = bone_data_list
         mesh_info_list = []
@@ -275,16 +300,16 @@ class ExportMSH(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
             vec4f = Vec4F(vertex.co)
             vec4f_list.append(vec4f)
 
-        with open(self.filepath, 'wb') as f:
-            f.write(Header.name)
-            f.write(struct.pack("i", Header.version))
-            f.write(struct.pack("i", Header.meshCount))
-            f.write(struct.pack("i", Header.unknown1))
-            f.write(struct.pack("i", Header.unknown2))
-            f.write(struct.pack("3f", *Header.bbMax))
-            f.write(struct.pack("3f", *Header.bbMin))
-            f.write(struct.pack("i", Header.boneCount))
-            f.write(struct.pack("i", Header.otherCount))
+        with open(output_filepath, 'wb') as f:
+            f.write(HeaderClass.name)
+            f.write(struct.pack("i", HeaderClass.version))
+            f.write(struct.pack("i", HeaderClass.meshCount))
+            f.write(struct.pack("i", HeaderClass.unknown1))
+            f.write(struct.pack("i", HeaderClass.unknown2))
+            f.write(struct.pack("3f", *HeaderClass.bbMax))
+            f.write(struct.pack("3f", *HeaderClass.bbMin))
+            f.write(struct.pack("i", HeaderClass.boneCount))
+            f.write(struct.pack("i", HeaderClass.otherCount))
 
             # Write bone data to the file
             for bone_data in bone_data_list:
@@ -312,6 +337,9 @@ class ExportMSH(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
                 f.write(mesh_data_pointer.pBoneWeight)
                 f.write(struct.pack("i", mesh_data_pointer.pBoneCount))
                 f.write(mesh_data_pointer.pBoneName)
+
+        output_filepath.close()
+        return {'FINISHED'}, output_filepath
 
 def menu_func_export(self, context):
     self.layout.operator(ExportMSH.bl_idname,
