@@ -1,8 +1,5 @@
 import bpy
 import bpy_extras.io_utils
-import struct
-import os
-import re
 from bpy.props import (
     IntProperty,
     BoolProperty,
@@ -10,7 +7,16 @@ from bpy.props import (
     CollectionProperty,
     EnumProperty,
 )
-from ExportMSH import *
+import struct
+import os
+import re
+import sys
+# Add the directory containing the ExportMSH.py file to sys.path
+dir_path = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(dir_path, 'MSHExporter'))
+
+# Import the ExportMSH module
+from .ExportMSH import *
 
 bl_info = {
     "name": "Dragon Nest MSH Exporter",
@@ -26,6 +32,11 @@ bl_info = {
 }
 
 #!!!!! IMPORTANT: RENAME THE BLEND FILE NAME TO MATCH THE DESIRED .MSH FILE NAME !!!!!!!
+file_path = bpy.data.filepath
+def readMSH(file_path):
+    with open(file_path, "rb") as originalFile:
+        version = read_int(originalFile, num=1)
+        print(version)
 
 class ExportMSH(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
     bl_idname = "export_msh.dragon_nest"
@@ -53,7 +64,7 @@ class ExportMSH(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
     )
 
     def execute (self, context):
-        print("Hello")
+        readMSH()
 
 def menu_func_export(self, context):
     self.layout.operator(ExportMSH.bl_idname,
