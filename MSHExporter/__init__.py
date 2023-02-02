@@ -70,6 +70,9 @@ class ExportMSH(bpy.types.Operator, ExportHelper):
         if 'SELECTED' in self.export_target and len(bpy.context.selected_objects) == 0:
             raise Exception("{} was chosen, but you have not selected any objects. "
                             " Don't forget to unhide all the objects you wish to select!".format(self.export_target))  
+        file_name, file_ext = os.path.splitext(self.filepath)
+        new_file_name = file_name + "_UPDATED" + file_ext
+        
         with open(self.filepath, 'rb') as f:
             header_data = f.read(1024)
             name, version, meshCount, unknown1, unknown2, bbMin_x, bbMin_y, bbMin_z, bbMax_x, bbMax_y, bbMax_z, boneCount, Attributes, AttachmentPoints, padding = struct.unpack("256s4i3f3fii4s716s", header_data)
@@ -77,58 +80,90 @@ class ExportMSH(bpy.types.Operator, ExportHelper):
             bbMin = (bbMin_x, bbMin_y, bbMin_z)
             bbMax = (bbMax_x, bbMax_y, bbMax_z)
             header = HeaderClass(name, version, meshCount, unknown1, unknown2, bbMin, bbMax, boneCount, Attributes, AttachmentPoints, empty)
-            f.seek(1344)
-            firstBoneData = BoneData()
-            firstBoneData.boneName = f.read(256)
-            firstBoneData.transformMatrix = f.read(64)
-            firstBoneData.boneName = struct.unpack("256s", firstBoneData.boneName)[0].strip(b'\0')
-            firstBoneData.transformMatrix = struct.unpack("16f", firstBoneData.transformMatrix)
-            print("First Bone Name:", firstBoneData.boneName)
-            print("First Bone T-Matrix:", firstBoneData.transformMatrix)
+            #meshCount = len(bpy.data.meshes)
+            armatures = [obj for obj in bpy.data.objects if obj.type == 'ARMATURE']
+            #boneCount = sum(len(armature.data.bones) for armature in armatures)
             
-        
-        file_name, file_ext = os.path.splitext(self.filepath)
-        new_file_name = file_name + "_UPDATED" + file_ext
-        meshCount = len(bpy.data.meshes)
-        armatures = [obj for obj in bpy.data.objects if obj.type == 'ARMATURE']
-        boneCount = sum(len(armature.data.bones) for armature in armatures)
-        '''To access the number of attributes and attachment points, you will need to know what data structure stores this information in Blender, 
-        and what the names of these variables are. You may need to consult Blender's API documentation or ask the developers of the file format you
-         are trying to export to.
-         COME BACK TO THIS LATER'''
-        
-        bone_data_list = []
-        for armature in armatures:
-            for bone in armature.data.bones:
-                bone_data = BoneData()
-                bone_data.boneName = bone.name.encode()[:256]
-                bone_matrix = armature.matrix_world @ bone.matrix_local
-                bone_data.transformMatrix = [list(row) for row in bone_matrix]
-                bone_data_list.append(bone_data)
+            bone_data_list = []
+            for i in range(boneCount):
+                bone_data = f.read(256+16*4)
+                bone_name, *transform_matrix = struct.unpack("256s" + 16 * "f", bone_data)  
+                bone_data_dict = {
+                    "bone_name": bone_name.strip().decode("utf-8"),
+                    "transform_matrix": list(transform_matrix)
+                }
+                bone_data_list.append(bone_data_dict)
 
+            meshEntries = []
+            boneNames = []
+            for i in range(meshCount):
+                sceneName = f.read(256).strip(b'\0').decode("utf-8")
+                meshName = f.read(256).strip(b'\0').decode("utf-8")
+                numVertices, numIndices, unknownA, bitflag = struct.unpack("4i", f.read(16))
+                padding = f.read(496) # padding
+                faceIndices = struct.unpack("{}h".format(numIndices), f.read(numIndices * 2))
+                vertices = struct.unpack("{}f".format(numVertices * 3), f.read(numVertices * 3 * 4))
+                normals = struct.unpack("{}f".format(numVertices * 3), f.read(numVertices * 3 * 4))
+                textureCoords = struct.unpack("{}f".format(numVertices * 2), f.read(numVertices * 2 * 4))
+                unknown3 = struct.unpack("{}i".format(numVertices), f.read(numVertices * 4))
+                boneIndices = struct.unpack("{}h".format(numVertices * 4), f.read(numVertices * 4 * 2))
+                boneWeights = struct.unpack("{}f".format(numVertices * 4), f.read(numVertices * 4 * 4))
+                numBoneNames, = struct.unpack("i", f.read(4))
+                bone_names = []
+                for j in range(numBoneNames):
+                    boneName = f.read(256).strip(b'\0').decode("utf-8")
+                    bone_names.append(boneName)
+
+            for j in range(numBoneNames):
+                boneName = f.read(256)
+                boneNames.append(struct.unpack("256s", boneName)[0].strip(b'\0').decode("utf-8"))
+
+                meshEntry = MeshEntry(
+                    sceneName,
+                    meshName,
+                    numVertices,
+                    numIndices,
+                    unknownA,
+                    bitflag,
+                    padding,
+                    faceIndices,
+                    vertices,
+                    normals,
+                    textureCoords,
+                    unknown3,
+                    boneIndices,
+                    boneWeights,
+                    numBoneNames,
+                    bone_names
+                )
+                meshEntries.append(meshEntry)
 
         with open(new_file_name, "wb") as outfile:    
             #Write MSH Header information to file
             outfile.write(struct.pack("256s4i3f3fii4s716s", header.name, header.version, header.meshCount, header.unknown1, header.unknown2, header.bbMin[0], header.bbMin[1], header.bbMin[2], header.bbMax[0], header.bbMax[1], header.bbMax[2], header.boneCount, header.Attributes, header.AttachmentPoints, header.empty))
-            #Write bone name and transform matrix to file, working but incorrectly... need to figure out why values from OG file are different
             for armature in armatures:
-                for bone in armature.data.bones:
-                    bone_data = BoneData()
-                    bone_data.boneName = bone.name.encode("utf-8").ljust(256, b'\0')
-                    bone_data.transformMatrix = armature.matrix_world @ bone.matrix_local
-                    bone_matrix = list(bone_data.transformMatrix)
-                    bone_matrix[1][:3] = [-bone_matrix[1][0], -bone_matrix[1][1], -bone_matrix[1][2]]
-                    bone_matrix[2][:3] = [-bone_matrix[2][0], -bone_matrix[2][1], -bone_matrix[2][2]]
-                    bone_matrix[0][1], bone_matrix[1][0] = bone_matrix[1][0], bone_matrix[0][1]
-                    bone_matrix[0][2], bone_matrix[2][0] = bone_matrix[2][0], bone_matrix[0][2]
-                    bone_matrix[1][2], bone_matrix[2][1] = bone_matrix[2][1], bone_matrix[1][2]
-                    bone_data.transformMatrix = bone_matrix
-                    outfile.write(bone_data.boneName)
-                    outfile.write(struct.pack("16f", *[x for y in bone_data.transformMatrix for x in y]))
-                    print("Bone name:", bone.name)
-                    print("Bone transform matrix:", bone_data.transformMatrix)
+                for bone_data in bone_data_list:
+                    if armature.data.bones.get(bone_data["bone_name"]) is not None:
+                         # Write the bone information if the bone exists in the armature's edit bones
+                        outfile.write(struct.pack("256s" + 16 * "f", bone_data["bone_name"].encode("utf-8"), *bone_data["transform_matrix"]))
+                        print("Bone name:", bone_data["bone_name"])
+                        print("Transform matrix:", bone_data["transform_matrix"])
+            for meshEntry in meshEntries:
+                outfile.write(struct.pack("256s", meshEntry.SceneName.encode("utf-8")))
+                outfile.write(struct.pack("256s", meshEntry.MeshName.encode("utf-8")))
+                outfile.write(struct.pack("4i", meshEntry.NumVertices, meshEntry.NumIndices, meshEntry.UnknownA, meshEntry.Bitflag))
+                outfile.write(meshEntry.Padding)
+                outfile.write(struct.pack("{}h".format(meshEntry.NumIndices), *meshEntry.FaceIndices))
+                outfile.write(struct.pack("{}f".format(meshEntry.NumVertices * 3), *meshEntry.Vertices))
+                outfile.write(struct.pack("{}f".format(meshEntry.NumVertices * 3), *meshEntry.Normals))
+                outfile.write(struct.pack("{}f".format(meshEntry.NumVertices * 2), *meshEntry.TextureCoords))
+                outfile.write(struct.pack("{}i".format(meshEntry.NumVertices), *meshEntry.Unknown3))
+                outfile.write(struct.pack("{}h".format(meshEntry.NumVertices * 4), *meshEntry.BoneIndices))
+                outfile.write(struct.pack("{}f".format(meshEntry.NumVertices * 4), *meshEntry.BoneWeights))
+                outfile.write(struct.pack("i", meshEntry.NumBoneNames))
+                for boneName in meshEntry.NumBoneNames:
+                    outfile.write(struct.pack("256s", boneName.encode("utf-8")))
 
-        
         print("Name:", name)
         print("Version:", version)
         print("Mesh count:", meshCount)
@@ -140,6 +175,23 @@ class ExportMSH(bpy.types.Operator, ExportHelper):
         print("Attributes:", Attributes)
         print("Attachment points:", AttachmentPoints)
         print("Empty:", empty)
+        for meshEntry in meshEntries:
+            print("Scene Name:", sceneName)
+            print("Mesh Name:", meshName)
+            print("Num Vertices:", numVertices)
+            print("Num Indices:", numIndices)
+            print("UnknownA", unknownA)
+            print("Bitflag:", bitflag)
+            print("Padding:", padding)
+            print("Face Indices:", faceIndices)
+            print("Vertices:", vertices)
+            print("Normals:", normals)
+            print("Texture Coords:", textureCoords)
+            print("Unknown 3:", unknown3)
+            print("Bone Indices:", boneIndices)
+            print("Bone Weights:", boneWeights)
+            print("Num Bone Names:", numBoneNames)
+            print("Bone Names:", boneNames)
         print("Done")
 
 def menu_func_export(self, context):

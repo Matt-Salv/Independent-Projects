@@ -20,7 +20,7 @@ class HeaderClass:               #Msh Header 1024 bytes
         self.unknown1 = unknown1 #unsure the type, 4 bytes
         self.unknown2 = unknown2 #unsure the type, 4 bytes
         self.bbMin = bbMin #bounding box min/max tells the game engine the object's size, visibility, collision for performance optimization
-        self.bbMax = bbMax #number of bones [B]
+        self.bbMax = bbMax
         self.boneCount = boneCount #number of bones [B]
         self.Attributes = Attributes #num attributes [At]
         self.AttachmentPoints = AttachmentPoints #number attachmentpoints [Ap]
@@ -31,58 +31,61 @@ class BoneData:             #256 + 64 / bone
         self.boneName = bytearray(256) #Bone name
         self.transformMatrix = [[0.0 for _ in range(4)] for _ in range(4)]
 
-    def __init__(self):
-        self.SceneName = bytearray(256) 
-        self.MeshName = bytearray(256)
-        self.NumVertices = 0
-        self.NumIndices = 0
-        self.Unknown = 0
-        self.Bitflag = 0
-        self.Padding = bytearray(496) #Including this line, and the preceding ones, this should = 1024 bytes.
-        self.FaceIndices = None  # Size 2x[I] short[I]
-        self.Vertices = None  # Size 4x[V] Float[V]
-        self.Normals = None  # size 4x[V] Float[V]
-        self.TextureCoords = None  # Size 4x[V] Float[V]
-        self.Unknown3 = None  # Size 4x[V] Int[V]
-        self.BoneIndices = None  # 2x4x[V] Short[4][V]
-        self.BoneWeights = None  # 4x4x[V] Float[4][V]
-        self.NumBoneNames = 0
-        self.BoneNames = []  # size 256x[N] FLString[N].
+class MeshEntry:
+    def __init__(self, SceneName, MeshName, NumVertices, NumIndices, UnknownA, Bitflag, Padding, FaceIndices, Vertices, Normals, TextureCoords, Unknown3, BoneIndices, BoneWeights, NumBoneNames, BoneNames):
+        self.SceneName = SceneName #start mesh entry header
+        self.MeshName = MeshName
+        self.NumVertices = NumVertices
+        self.NumIndices = NumIndices
+        self.UnknownA = UnknownA #Unknown value in Mesh Entry header
+        self.Bitflag = Bitflag
+        self.Padding = Padding #Including this line, and the preceding ones, this should = 1024 bytes.
+        self.FaceIndices = FaceIndices  # Size 2x[I] short[I]
+        self.Vertices = Vertices  # Size 4x[V] Float[V]
+        self.Normals = Normals  # size 4x[V] Float[V]
+        self.TextureCoords = TextureCoords  # Size 4x[V] Float[V]
+        self.Unknown3 = Unknown3  # Size 4x[V] Int[V]
+        self.BoneIndices = BoneIndices  # 2x4x[V] Short[4][V]
+        self.BoneWeights = BoneWeights  # 4x4x[V] Float[4][V]
+        self.NumBoneNames = NumBoneNames
+        self.BoneNames = BoneNames  # size 256x[N] List[String][N].
 
 class Attribute:
-    def __init__(self, attachment_points):
+    def __init__(self, header, attachment_points):
         self.attributes = []
-        self.header = HeaderClass()
-        for i in range(attachment_points):
-            attribute = Attribute(i)
+        self.header = header
+        self.attachment_points = attachment_points
+        for i in range(self.attachment_points):
+            attribute = self.Attribute(header, i)
             self.attributes.append(attribute)
     
     class Attribute:
-        def __init__(self, index):
+        def __init__(self, header, index):
             self.attribute_type = None
-            self.parent_name = bytearray(256)
-            self.unknown0 = [0.0 for _ in range(15)]
-            self.unknown1 = [0.0 for _ in range(4)]
-            self.unknown2 = [0.0 for _ in range(7)]
-            self.unknown3_matrices = [[[0.0 for _ in range(3)] for _ in range(3)] for _ in range(3)]
-            
-            if self.header.version >= 0.11:
-                self.parent_name = bytearray(256)
+            self.parent_name = bytearray(256) if header.version >= 11 else None
+            self.attribute_type0 = [0.0 for _ in range(15)]
+            self.attribute_type1 = [0.0 for _ in range(4)]
+            self.attribute_type2 = [0.0 for _ in range(7)]
+            mesh_count = header.mesh_count
+            self.number_entries = 0
+            self.unknown_matrices = [[[0.0 for _ in range(3)] for _ in range(3)] for _ in range(mesh_count)]
+
+            if header.version >= 0.11:
                 self.translation = [0.0, 0.0, 0.0]
             
-            if self.header.version >= 0.12:
+            if header.version >= 0.12:
                 self.transform_matrix = [[0.0 for _ in range(4)] for _ in range(4)]
 
 class AttachmentPoint:
-    def __init__(self):
+    def __init__(self, header):
         self.name = bytearray(256)
         self.translation = [0.0, 0.0, 0.0]
         self.parent_bone_name = bytearray(256)
         self.transform_matrix = [[0.0 for _ in range(4)] for _ in range(4)]
         
-        if HeaderClass.version >= 0.12:
+        if header.version >= 0.12:
             self.translation = [0.0,0.0,0.0]
-        if HeaderClass.version >= 0.13:
+        if header.version >= 0.13:
             self.parent_bone_name = bytearray(256)
             self.transform_matrix = [[0.0 for _ in range(4)] for _ in range(4)]
 
